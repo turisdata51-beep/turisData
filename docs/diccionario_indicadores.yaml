@@ -1,0 +1,576 @@
+# =============================================================================
+# Diccionario versionado de indicadores - Observatorio Turístico Inteligente de Cuenca
+# -----------------------------------------------------------------------------
+# Unifica la "ficha mínima de indicador" del anteproyecto (Anexo B) con el
+# "diccionario mínimo" del Manual Metodológico v2 (Anexo B).
+# El sistema lee este archivo para registrar indicadores (RF-06, RF-12).
+# Regla: un cambio de fórmula, universo o unidad genera una NUEVA versión;
+# nunca se edita una versión publicada.
+# =============================================================================
+
+metadatos:
+  version_diccionario: "0.1.0"
+  estado: borrador            # borrador | aprobado (requiere visto bueno del enlace de la Cámara)
+  fecha: "2026-10-27"
+  manual_referencia: "Manual Metodológico de Indicadores v2.0 (agosto 2026)"
+  anteproyecto_referencia: "Anteproyecto de titulación (agosto 2026), secciones 7 y 8"
+  responsable_por_defecto: "Por designar (enlace Cámara de Turismo del Azuay)"
+
+# -----------------------------------------------------------------------------
+# Valores permitidos (usados por todas las fichas)
+# -----------------------------------------------------------------------------
+catalogos:
+  tipo_base:
+    estandar: "Indicador definido por estándar u organismo oficial (IRTS, Eurostat, ETIS)"
+    kpi_sectorial: "KPI sectorial con fórmula pública (CoStar/STR, AirDNA)"
+    calculo_operativo: "Cálculo operativo transparente del observatorio"
+    interno: "Indicador interno de calidad del sistema (no es estadística turística)"
+  bandera_dato: [observado, estimado, pronosticado]
+  universo:
+    alojamiento_formal_habitaciones: "Establecimientos de alojamiento reportantes; unidad: habitación-noche"
+    alojamiento_formal_plazas: "Establecimientos de alojamiento reportantes; unidad: plaza-cama-noche"
+    alojamiento_formal_huespedes: "Huéspedes registrados en establecimientos reportantes"
+    poblacion_residente: "Población residente (INEC)"
+    sistema: "Fuentes, cargas y registros del propio observatorio"
+  periodicidad: [diaria, semanal, mensual, trimestral, anual, feriado, por_carga]
+  geografia_niveles: [canton, zona, parroquia]
+
+# -----------------------------------------------------------------------------
+# Variables base: lo que se captura (plantilla de reporte) o se importa.
+# Los indicadores solo pueden usar variables declaradas aquí.
+# -----------------------------------------------------------------------------
+variables_base:
+  establecimientos_reportantes: {unidad: establecimientos, origen: "conteo de reportes válidos"}
+  establecimientos_esperados:   {unidad: establecimientos, origen: "padrón de asociados participantes"}
+  llegadas_residentes:          {unidad: llegadas, origen: plantilla_alojamiento}
+  llegadas_no_residentes:       {unidad: llegadas, origen: plantilla_alojamiento}
+  noches_residentes:            {unidad: noches, origen: plantilla_alojamiento}
+  noches_no_residentes:         {unidad: noches, origen: plantilla_alojamiento}
+  habitaciones_noche_disponibles: {unidad: habitaciones-noche, origen: plantilla_alojamiento}
+  habitaciones_noche_ocupadas:  {unidad: habitaciones-noche, origen: plantilla_alojamiento}
+  plazas_cama_noche_disponibles: {unidad: plazas-cama-noche, origen: plantilla_alojamiento}
+  ingreso_habitaciones_usd:     {unidad: USD, origen: plantilla_alojamiento, nota: "Sin IVA ni servicio; solo venta de habitaciones"}
+  poblacion_residente:          {unidad: personas, origen: "INEC (Censo 2022 / proyecciones)"}
+  campos_criticos_validos:      {unidad: campos, origen: "validador de cargas"}
+  campos_criticos_esperados:    {unidad: campos, origen: "validador de cargas"}
+  registros_validos:            {unidad: registros, origen: "validador de cargas"}
+  registros_recibidos:          {unidad: registros, origen: "validador de cargas"}
+  fuentes_al_dia:               {unidad: fuentes, origen: "catálogo de fuentes + SLA"}
+  fuentes_prioritarias:         {unidad: fuentes, origen: "catálogo de fuentes"}
+
+# Variables derivadas (sumas simples, para no repetir en cada fórmula)
+variables_derivadas:
+  llegadas_total: "llegadas_residentes + llegadas_no_residentes"
+  noches_total: "noches_residentes + noches_no_residentes"
+
+# -----------------------------------------------------------------------------
+# Reglas transversales
+# -----------------------------------------------------------------------------
+reglas:
+  confidencialidad:
+    minimo_establecimientos_por_celda: 3   # PROPUESTA: confirmar con la Cámara
+    accion: "Si n < mínimo, el valor se calcula pero no se publica (publicable = false)"
+  variacion_interanual:
+    formula: "(valor_actual - valor_mismo_periodo_anio_anterior) / valor_mismo_periodo_anio_anterior * 100"
+    unidad: "%"
+    si_base_cero: "no_calculable"
+    nota: "Mostrar siempre también los valores absolutos (Manual, Anexo A)"
+  no_mezclar_universos: >
+    La ocupación por habitaciones, por plazas-cama y la ocupación STR son series
+    distintas; nunca se combinan en un mismo valor (Manual, sección 2).
+  numerador_y_denominador: >
+    Ambos deben salir del mismo universo, período, geografía y conjunto de
+    establecimientos reportantes.
+
+# -----------------------------------------------------------------------------
+# Fichas de indicadores
+# mvp_5: propuesta de los 5 KPI del MVP (anteproyecto pide 5; confirmar con la Cámara)
+# fase: mvp | mvp_ampliado | segunda | avanzada  (Manual, sección 10)
+# -----------------------------------------------------------------------------
+indicadores:
+
+  - codigo: A1
+    version: 1
+    nombre: Llegadas de turistas
+    tipo_base: estandar
+    fase: mvp
+    mvp_5: true
+    prioridad: alta
+    objetivo_decision: "Dimensionar la demanda y comparar temporadas, feriados y mercados emisores."
+    definicion_negocio: "Cuántos turistas (visitantes que pernoctan) se registraron en los alojamientos reportantes."
+    definicion_estadistica: "Número de huéspedes que inician su estancia (check-in) en el período, según IRTS 2008."
+    calculo:
+      expresion: "llegadas_total"
+    formula_texto: "Llegadas_t = Σ registros de llegada de turistas en t"
+    unidad: llegadas
+    universo: alojamiento_formal_huespedes
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [residencia, tipo_alojamiento, categoria, parroquia]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Establecimiento sin reporte no se imputa; se refleja en Q1."
+      duplicados: "Un solo reporte vigente por establecimiento y mes; uno nuevo reemplaza al anterior."
+      atipicos: "Alerta si varía > ±60 % frente al mismo mes del año anterior del mismo establecimiento."
+    limitaciones: "Mide flujo, no duración. Solo cubre alojamiento formal reportante; no incluye visitantes del día ni alojamiento STR."
+    referencias: ["IRTS 2008", "Eurostat tour_occ", "MINTUR Turismo en cifras"]
+    responsable: null
+
+  - codigo: A2
+    version: 1
+    nombre: Pernoctaciones
+    tipo_base: estandar
+    fase: mvp
+    mvp_5: true
+    prioridad: alta
+    objetivo_decision: "Medir el volumen real de estancia; base de ocupación, estancia media e intensidad turística."
+    definicion_negocio: "Total de noches que los huéspedes pasaron en los alojamientos reportantes."
+    definicion_estadistica: "Σ noches efectivamente pernoctadas por huéspedes en el período (Eurostat 'nights spent'; ETIS B.1.1)."
+    calculo:
+      expresion: "noches_total"
+    formula_texto: "Noches_t = Σ noches pernoctadas"
+    unidad: noches
+    universo: alojamiento_formal_huespedes
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [residencia, tipo_alojamiento, categoria, parroquia]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "No se imputa; ver Q1."
+      duplicados: "Igual que A1."
+      atipicos: "Rechazo si noches > plazas_cama_noche_disponibles del mismo reporte."
+    limitaciones: "Una noche de una persona = 1 pernoctación (no se cuenta por habitación)."
+    referencias: ["Eurostat tour_occ", "ETIS 2016 B.1.1"]
+    responsable: null
+
+  - codigo: A4
+    version: 1
+    nombre: Estancia media
+    tipo_base: estandar
+    fase: mvp
+    mvp_5: true
+    prioridad: alta
+    objetivo_decision: "Identificar mercados y temporadas con mayor permanencia; diseñar productos de estadía."
+    definicion_negocio: "Cuántas noches se queda, en promedio, cada turista."
+    definicion_estadistica: "Noches turísticas / llegadas de turistas, mismo universo y período (ETIS B.2.1)."
+    calculo:
+      numerador: "noches_total"
+      denominador: "llegadas_total"
+      factor: 1
+    formula_texto: "Estancia media = Noches / Llegadas"
+    unidad: noches por llegada
+    universo: alojamiento_formal_huespedes
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [residencia, tipo_alojamiento, categoria]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Si llegadas = 0, no calculable."
+      duplicados: "Igual que A1."
+      atipicos: "Alerta si < 1 o > 15 noches."
+    limitaciones: "Mayor estancia no implica mayor gasto diario."
+    referencias: ["ETIS 2016 B.2.1", "Eurostat tour_occ"]
+    responsable: null
+
+  - codigo: A5
+    version: 1
+    nombre: Cuota de noches de no residentes
+    tipo_base: estandar
+    fase: mvp_ampliado
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Medir la dependencia del mercado internacional frente al nacional."
+    definicion_negocio: "Qué porcentaje de las noches corresponde a huéspedes que viven fuera del Ecuador."
+    definicion_estadistica: "Noches de no residentes / noches totales × 100 (Eurostat)."
+    calculo:
+      numerador: "noches_no_residentes"
+      denominador: "noches_total"
+      factor: 100
+    formula_texto: "Cuota (%) = Noches no residentes / Noches totales × 100"
+    unidad: "%"
+    universo: alojamiento_formal_huespedes
+    periodicidad: mensual
+    geografia: [canton]
+    dimensiones_filtro: [tipo_alojamiento, categoria]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "No se imputa."
+      duplicados: "Igual que A1."
+      atipicos: "Sin regla específica."
+    limitaciones: "Residencia = país de residencia habitual, no nacionalidad. La plantilla ya captura el dato, por eso se adelanta respecto del Manual (segunda fase)."
+    referencias: ["Eurostat tour_occ"]
+    responsable: null
+
+  - codigo: B1
+    version: 1
+    nombre: Establecimientos de alojamiento reportantes
+    tipo_base: estandar
+    fase: mvp
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Conocer la estructura de la oferta participante por tipo, categoría y territorio."
+    definicion_negocio: "Cuántos establecimientos activos enviaron su reporte del mes."
+    definicion_estadistica: "Conteo de unidades activas con reporte válido en el período."
+    calculo:
+      expresion: "establecimientos_reportantes"
+    formula_texto: "Establecimientos_t = conteo de unidades con reporte válido"
+    unidad: establecimientos
+    universo: alojamiento_formal_habitaciones
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [tipo_alojamiento, categoria, parroquia]
+    fuentes: [plantilla_alojamiento_camara, catastro_mintur]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "N/A"
+      duplicados: "Por código de establecimiento."
+      atipicos: "N/A"
+    limitaciones: "No es el total del catastro de Cuenca; solo los participantes. Para el total usar el Catastro de MINTUR como serie separada."
+    referencias: ["Eurostat capacidad", "MINTUR Catastro Turístico"]
+    responsable: null
+
+  - codigo: B2
+    version: 1
+    nombre: Habitaciones-noche disponibles
+    tipo_base: estandar
+    fase: mvp
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Conocer la capacidad realmente comercializable (denominador de ocupación y RevPAR)."
+    definicion_negocio: "Suma de las habitaciones a la venta cada noche del mes."
+    definicion_estadistica: "Σ habitaciones ofertadas cada día del período, excluyendo cierres temporales (INEC/MINTUR ECA)."
+    calculo:
+      expresion: "habitaciones_noche_disponibles"
+    formula_texto: "HN disponibles = Σ habitaciones ofertadas por día"
+    unidad: habitaciones-noche
+    universo: alojamiento_formal_habitaciones
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [tipo_alojamiento, categoria, parroquia]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Campo crítico: sin él el reporte se rechaza."
+      duplicados: "Igual que A1."
+      atipicos: "Rechazo si > habitaciones_instaladas × días del mes."
+    limitaciones: "Depende de que el establecimiento descuente correctamente las habitaciones fuera de servicio."
+    referencias: ["Eurostat net occupancy of bedrooms", "INEC/MINTUR Encuesta Coyuntural de Alojamiento"]
+    responsable: null
+
+  - codigo: B3
+    version: 1
+    nombre: Plazas-cama-noche disponibles
+    tipo_base: estandar
+    fase: mvp_ampliado
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Medir la capacidad en personas; base de B5 y D6."
+    definicion_negocio: "Suma de las camas (plazas) a la venta cada noche del mes."
+    definicion_estadistica: "Σ plazas-cama ofertadas cada día (Eurostat bed places)."
+    calculo:
+      expresion: "plazas_cama_noche_disponibles"
+    formula_texto: "PCN disponibles = Σ plazas-cama ofertadas por día"
+    unidad: plazas-cama-noche
+    universo: alojamiento_formal_plazas
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [tipo_alojamiento, categoria, parroquia]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Campo crítico."
+      duplicados: "Igual que A1."
+      atipicos: "Rechazo si < habitaciones_noche_disponibles."
+    limitaciones: "Una cama doble = 2 plazas."
+    referencias: ["Eurostat tour_occ"]
+    responsable: null
+
+  - codigo: B4
+    version: 1
+    nombre: Ocupación neta de habitaciones
+    tipo_base: estandar
+    fase: mvp
+    mvp_5: true
+    prioridad: alta
+    objetivo_decision: "Monitorear la demanda alojativa y coordinar oferta ante picos y temporadas bajas."
+    definicion_negocio: "Porcentaje de las habitaciones disponibles que se vendieron."
+    definicion_estadistica: "Habitaciones-noche ocupadas / habitaciones-noche disponibles × 100 (Eurostat; CoStar/STR)."
+    calculo:
+      numerador: "habitaciones_noche_ocupadas"
+      denominador: "habitaciones_noche_disponibles"
+      factor: 100
+    formula_texto: "Ocupación (%) = HN ocupadas / HN disponibles × 100"
+    unidad: "%"
+    universo: alojamiento_formal_habitaciones
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [tipo_alojamiento, categoria, parroquia]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Si disponibles = 0, no calculable."
+      duplicados: "Igual que A1."
+      atipicos: "Rechazo si ocupadas > disponibles."
+    limitaciones: "No comparar con ocupación por plazas-cama (B5) ni con ocupación STR (C4)."
+    referencias: ["Eurostat net occupancy rate of bedrooms", "CoStar/STR Occupancy", "INEC/MINTUR ECA"]
+    responsable: null
+
+  - codigo: B5
+    version: 1
+    nombre: Ocupación neta de plazas-cama
+    tipo_base: estandar
+    fase: mvp_ampliado
+    mvp_5: false
+    prioridad: media
+    objetivo_decision: "Comparabilidad con estadísticas internacionales de uso de capacidad."
+    definicion_negocio: "Porcentaje de las camas disponibles que se usaron."
+    definicion_estadistica: "Noches de huéspedes / plazas-cama-noche disponibles × 100 (Eurostat)."
+    calculo:
+      numerador: "noches_total"
+      denominador: "plazas_cama_noche_disponibles"
+      factor: 100
+    formula_texto: "Ocupación plazas (%) = Noches / PCN disponibles × 100"
+    unidad: "%"
+    universo: alojamiento_formal_plazas
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [tipo_alojamiento, categoria]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Si PCN = 0, no calculable."
+      duplicados: "Igual que A1."
+      atipicos: "Rechazo si noches > PCN disponibles."
+    limitaciones: "Sensible al número de personas por habitación; no equivale a B4."
+    referencias: ["Eurostat tour_occ"]
+    responsable: null
+
+  - codigo: B6
+    version: 1
+    nombre: ADR hotelero (tarifa media diaria)
+    tipo_base: kpi_sectorial
+    fase: mvp
+    mvp_5: true
+    prioridad: alta
+    objetivo_decision: "Evaluar la estrategia de precios por temporada y segmento."
+    definicion_negocio: "Precio promedio efectivamente cobrado por cada habitación vendida."
+    definicion_estadistica: "Ingreso de habitaciones / habitaciones-noche ocupadas (CoStar/STR)."
+    calculo:
+      numerador: "ingreso_habitaciones_usd"
+      denominador: "habitaciones_noche_ocupadas"
+      factor: 1
+    formula_texto: "ADR = Ingreso habitaciones / HN ocupadas"
+    unidad: USD por habitación vendida
+    universo: alojamiento_formal_habitaciones
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [tipo_alojamiento, categoria]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Ingreso es opcional en la plantilla: ADR se calcula solo con establecimientos que lo reportan; su cobertura se muestra aparte."
+      duplicados: "Igual que A1."
+      atipicos: "Alerta si ADR < 10 USD o > 500 USD."
+    limitaciones: "Solo ingreso de habitaciones, sin IVA, servicio, alimentos ni otros departamentos. Depende de que los hoteles compartan ingresos (confirmar con la Cámara)."
+    referencias: ["CoStar/STR ADR"]
+    responsable: null
+
+  - codigo: B7
+    version: 1
+    nombre: RevPAR hotelero
+    tipo_base: kpi_sectorial
+    fase: mvp_ampliado
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Comparar desempeño combinando precio y ocupación."
+    definicion_negocio: "Ingreso de habitaciones por cada habitación disponible, vendida o no."
+    definicion_estadistica: "Ingreso de habitaciones / habitaciones-noche disponibles (CoStar/STR); equivale a ADR × ocupación."
+    calculo:
+      numerador: "ingreso_habitaciones_usd"
+      denominador: "habitaciones_noche_disponibles"
+      factor: 1
+    formula_texto: "RevPAR = Ingreso habitaciones / HN disponibles"
+    unidad: USD por habitación disponible
+    universo: alojamiento_formal_habitaciones
+    periodicidad: mensual
+    geografia: [canton, parroquia]
+    dimensiones_filtro: [tipo_alojamiento, categoria]
+    fuentes: [plantilla_alojamiento_camara]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Mismo subconjunto de establecimientos que B6 (los que reportan ingreso)."
+      duplicados: "Igual que A1."
+      atipicos: "Sin regla adicional."
+    limitaciones: "Numerador y denominador solo de los establecimientos que reportan ingreso."
+    referencias: ["CoStar/STR RevPAR"]
+    responsable: null
+
+  - codigo: D4
+    version: 1
+    nombre: Intensidad turística
+    tipo_base: estandar
+    fase: mvp_ampliado
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Identificar períodos de mayor presión relativa sobre la ciudad."
+    definicion_negocio: "Noches de turistas por cada 1.000 habitantes."
+    definicion_estadistica: "Noches turísticas / población residente × 1.000 (Eurostat tourism intensity)."
+    calculo:
+      numerador: "noches_total"
+      denominador: "poblacion_residente"
+      factor: 1000
+    formula_texto: "Intensidad = Noches / Población × 1.000"
+    unidad: noches por 1.000 habitantes
+    universo: alojamiento_formal_huespedes
+    periodicidad: mensual
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [plantilla_alojamiento_camara, inec_poblacion]
+    cobertura_ver: Q1
+    tratamiento:
+      faltantes: "Usar la población del año del período; si no existe, la última disponible marcada como estimado."
+      duplicados: "N/A"
+      atipicos: "N/A"
+    limitaciones: "Con cobertura parcial de hoteles, subestima la intensidad real. Mostrar siempre junto con Q1."
+    referencias: ["Eurostat tourism intensity"]
+    responsable: null
+
+  # ---------------- Indicadores internos de calidad (Manual sección 9 + anteproyecto 8.2) ----
+
+  - codigo: Q1
+    version: 1
+    nombre: Cobertura de establecimientos reportantes
+    tipo_base: interno
+    fase: mvp
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Saber si un cambio en los KPI es real o se debe a que reportaron menos establecimientos."
+    definicion_negocio: "Porcentaje de los establecimientos comprometidos que enviaron su reporte válido."
+    definicion_estadistica: "Unidades con reporte válido / unidades esperadas × 100."
+    calculo:
+      numerador: "establecimientos_reportantes"
+      denominador: "establecimientos_esperados"
+      factor: 100
+    formula_texto: "Cobertura (%) = Reportantes / Esperados × 100"
+    unidad: "%"
+    universo: sistema
+    periodicidad: mensual
+    geografia: [canton]
+    dimensiones_filtro: [tipo_alojamiento, categoria]
+    fuentes: [plantilla_alojamiento_camara]
+    tratamiento: {faltantes: "N/A", duplicados: "N/A", atipicos: "N/A"}
+    limitaciones: "Indicador interno del observatorio."
+    referencias: ["Manual v2, Q1"]
+    responsable: null
+
+  - codigo: Q2
+    version: 1
+    nombre: Completitud de campos críticos
+    tipo_base: interno
+    fase: mvp
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Bloquear o advertir publicaciones cuando faltan variables esenciales."
+    definicion_negocio: "Porcentaje de campos obligatorios que llegaron con un valor válido."
+    definicion_estadistica: "Campos críticos válidos / campos críticos esperados × 100."
+    calculo:
+      numerador: "campos_criticos_validos"
+      denominador: "campos_criticos_esperados"
+      factor: 100
+    formula_texto: "Completitud (%) = Campos válidos / Campos esperados × 100"
+    unidad: "%"
+    universo: sistema
+    periodicidad: por_carga
+    geografia: [canton]
+    dimensiones_filtro: [fuente]
+    fuentes: [sistema]
+    tratamiento: {faltantes: "N/A", duplicados: "N/A", atipicos: "N/A"}
+    limitaciones: "Mide faltantes, no exactitud."
+    referencias: ["Manual v2, Q2"]
+    responsable: null
+
+  - codigo: Q3
+    version: 1
+    nombre: Frescura del dato
+    tipo_base: interno
+    fase: mvp
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Mostrar la antigüedad real de cada cifra (RF-11) y no llamar 'tiempo real' a datos mensuales."
+    definicion_negocio: "Días desde la última carga válida de cada fuente."
+    definicion_estadistica: "Fecha-hora actual − fecha-hora del último dato válido."
+    calculo:
+      expresion: "ahora - ultima_carga_valida"
+    formula_texto: "Frescura = Ahora − Último dato válido"
+    unidad: días
+    universo: sistema
+    periodicidad: diaria
+    geografia: [canton]
+    dimensiones_filtro: [fuente]
+    fuentes: [sistema]
+    tratamiento: {faltantes: "Fuente sin cargas = 'sin datos'", duplicados: "N/A", atipicos: "N/A"}
+    limitaciones: "Indicador interno del observatorio."
+    referencias: ["Manual v2, Q3"]
+    responsable: null
+
+  - codigo: Q4
+    version: 1
+    nombre: Fuentes prioritarias al día (SLA)
+    tipo_base: interno
+    fase: mvp
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Métrica principal de éxito del anteproyecto (meta piloto ≥ 80 %)."
+    definicion_negocio: "Porcentaje de fuentes prioritarias actualizadas dentro del plazo acordado."
+    definicion_estadistica: "Fuentes cuya Q3 ≤ SLA / fuentes prioritarias × 100."
+    calculo:
+      numerador: "fuentes_al_dia"
+      denominador: "fuentes_prioritarias"
+      factor: 100
+    formula_texto: "Fuentes al día (%) = Fuentes dentro de SLA / Fuentes prioritarias × 100"
+    unidad: "%"
+    universo: sistema
+    periodicidad: semanal
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [sistema]
+    tratamiento: {faltantes: "N/A", duplicados: "N/A", atipicos: "N/A"}
+    limitaciones: "Proviene del anteproyecto ('cobertura de fuentes'); se separa de Q1 para no confundir fuentes con establecimientos."
+    referencias: ["Anteproyecto, secciones 6 y 17"]
+    responsable: null
+
+  - codigo: Q5
+    version: 1
+    nombre: Registros válidos por carga
+    tipo_base: interno
+    fase: mvp
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Controlar la calidad de cada importación (meta piloto ≥ 95 %)."
+    definicion_negocio: "Porcentaje de filas de un archivo que pasaron todas las validaciones."
+    definicion_estadistica: "Registros válidos / registros recibidos × 100."
+    calculo:
+      numerador: "registros_validos"
+      denominador: "registros_recibidos"
+      factor: 100
+    formula_texto: "Calidad de carga (%) = Registros válidos / Registros recibidos × 100"
+    unidad: "%"
+    universo: sistema
+    periodicidad: por_carga
+    geografia: [canton]
+    dimensiones_filtro: [fuente]
+    fuentes: [sistema]
+    tratamiento: {faltantes: "N/A", duplicados: "N/A", atipicos: "N/A"}
+    limitaciones: "Proviene del anteproyecto ('calidad de carga'); complementa a Q2."
+    referencias: ["Anteproyecto, secciones 8.2 y 17"]
+    responsable: null
+
+# Indicadores del manual que NO entran en esta versión (se agregarán como nuevas fichas):
+# A3, A6-A9 (requieren encuestas), C1-C8 (requieren convenio STR), D1-D3, D5-D8, E1-E6, B8-B9.
+# Indicadores del anteproyecto pendientes de definir con fuente: origen del visitante
+# (cubierto parcialmente por residencia en A1/A2), llegadas por canal (requiere terminal/
+# aeropuerto) y actividad por temporada (se resuelve como vista de series de A2/B4).

@@ -1,0 +1,10 @@
+# Dependencias y entornos
+node_modules/
+.venv/
+__pycache__/
+
+# Compilados
+frontend/dist/
+
+# Configuración local con secretos
+backend/.env
