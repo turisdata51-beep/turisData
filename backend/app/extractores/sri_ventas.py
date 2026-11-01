@@ -14,9 +14,8 @@ from calendar import monthrange
 from datetime import date
 
 from bs4 import BeautifulSoup
-from sqlalchemy import text
 
-from ..db import fila
+from ..nucleo.db import fila
 from .base import Dato, Extractor
 
 PRIMER_ANIO = 2018
@@ -88,23 +87,3 @@ class SriVentas(Extractor):
             ))
         return datos
 
-
-def registrar_fuente():
-    """Crea la fuente y la variable en el catálogo si no existen (idempotente)."""
-    from ..db import transaccion
-    with transaccion() as con:
-        con.execute(text("""
-            INSERT INTO operativo.fuente_datos (codigo, nombre, entidad_propietaria, formato, periodicidad,
-                datos_personales, sla_dias, prioritaria, tipo_fuente, condiciones_licencia, cobertura_geografica,
-                variables_principales, observaciones)
-            VALUES ('sri_ventas', 'Ventas por cantón y actividad (datos abiertos)', 'Servicio de Rentas Internas (SRI)',
-                'csv', 'mensual', 'no', 75, true, 'oficial', 'Datos abiertos del SRI; robots.txt permite el acceso',
-                'Cantón Cuenca', 'Total de ventas de la sección CIIU I (alojamiento y comidas)',
-                'Extracción automática por scraping de https://www.sri.gob.ec/datasets')
-            ON CONFLICT (codigo) DO NOTHING"""))
-        con.execute(text("""
-            INSERT INTO operativo.variable_externa (codigo, nombre, unidad, descripcion, fuente_id, indicadores)
-            SELECT 'sri_ventas_seccion_i', 'Ventas de alojamiento y servicios de comidas', 'USD',
-                   'Total de ventas declaradas de la sección CIIU I en el cantón Cuenca (incluye I55 e I56)',
-                   id, ARRAY['D1'] FROM operativo.fuente_datos WHERE codigo = 'sri_ventas'
-            ON CONFLICT (codigo) DO NOTHING"""))

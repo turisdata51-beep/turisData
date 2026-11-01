@@ -10,11 +10,8 @@ services:
       - "5433:5432"
     volumes:
       - datos_db:/var/lib/postgresql/data
-      # Se ejecutan en orden alfabético solo la primera vez (volumen vacío)
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
-      - ./db/seed.sql:/docker-entrypoint-initdb.d/001b_seed.sql:ro
-      - ./db/002_sitio.sql:/docker-entrypoint-initdb.d/002_sitio.sql:ro
-      - ./db/003_extracciones.sql:/docker-entrypoint-initdb.d/003_extracciones.sql:ro
+      # Todos los scripts de db/ se ejecutan en orden numérico, solo la primera vez (volumen vacío)
+      - ./db:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U observatorio -d observatorio"]
       interval: 5s

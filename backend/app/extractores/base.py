@@ -19,7 +19,7 @@ from urllib.robotparser import RobotFileParser
 import httpx
 from sqlalchemy import text
 
-from ..db import transaccion
+from ..nucleo.db import transaccion
 
 AGENTE = "TurisData-Observatorio/0.1 (proyecto de titulacion; Camara de Turismo del Azuay)"
 PAUSA_ENTRE_PETICIONES = 2.0  # segundos, para no sobrecargar los sitios

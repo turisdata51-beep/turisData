@@ -1,11 +1,9 @@
 import sys
 
 from . import EXTRACTORES
-from .sri_ventas import registrar_fuente
 
 
 def main():
-    registrar_fuente()
     argumentos = [a for a in sys.argv[1:] if not a.startswith("--")]
     forzar = "--forzar" in sys.argv
     if not argumentos and "--todos" not in sys.argv:
