@@ -6,14 +6,17 @@ import Auditoria from './paginas/admin/Auditoria'
 import Cargas from './paginas/admin/Cargas'
 import ContenidoSitio from './paginas/admin/ContenidoSitio'
 import Establecimientos from './paginas/admin/Establecimientos'
+import FuentesExtracciones from './paginas/admin/FuentesExtracciones'
 import Indicadores from './paginas/admin/Indicadores'
 import LayoutAdmin from './paginas/admin/LayoutAdmin'
 import MisReportes from './paginas/admin/MisReportes'
 import Resumen from './paginas/admin/Resumen'
 import Usuarios from './paginas/admin/Usuarios'
+import Economia from './paginas/publico/Economia'
 import Inicio from './paginas/publico/Inicio'
 import Metodologia from './paginas/publico/Metodologia'
 import Observatorio from './paginas/publico/Observatorio'
+import Sostenibilidad from './paginas/publico/Sostenibilidad'
 import { ProveedorSesion } from './sesion/sesion'
 
 createRoot(document.getElementById('root')!).render(
@@ -23,11 +26,14 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/" element={<Inicio />} />
           <Route path="/observatorio" element={<Observatorio />} />
+          <Route path="/economia" element={<Economia />} />
+          <Route path="/sostenibilidad" element={<Sostenibilidad />} />
           <Route path="/metodologia" element={<Metodologia />} />
           <Route path="/admin" element={<LayoutAdmin />}>
             <Route index element={<Resumen />} />
             <Route path="cargas" element={<Cargas />} />
             <Route path="mis-reportes" element={<MisReportes />} />
+            <Route path="fuentes" element={<FuentesExtracciones />} />
             <Route path="establecimientos" element={<Establecimientos />} />
             <Route path="indicadores" element={<Indicadores />} />
             <Route path="usuarios" element={<Usuarios />} />

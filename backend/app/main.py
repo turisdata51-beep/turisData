@@ -1,4 +1,5 @@
 """Punto de entrada de la API (carpeta backend): uvicorn app.main:app --port 8000"""
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,7 @@ from .api import admin, auth, publico
 from .nucleo.config import CORS_ORIGENES
 from .nucleo.db import fila, transaccion
 from .nucleo.seguridad import hash_contrasena
+from .servicios import programador
 from .servicios.diccionario import sincronizar
 from .servicios.indicadores import recalcular
 
@@ -32,7 +34,10 @@ async def inicio(app: FastAPI):
     if sincronizar():  # hay versiones nuevas en el diccionario de indicadores
         recalcular()
     _crear_admin_inicial()
+    tarea = asyncio.create_task(programador.ciclo()) if programador.activo() else None
     yield
+    if tarea:
+        tarea.cancel()
 
 
 app = FastAPI(title="TurisData – Observatorio Turístico de Cuenca", version="0.1.0", lifespan=inicio)

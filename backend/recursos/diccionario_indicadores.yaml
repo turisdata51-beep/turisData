@@ -31,6 +31,9 @@ catalogos:
     alojamiento_formal_plazas: "Establecimientos de alojamiento reportantes; unidad: plaza-cama-noche"
     alojamiento_formal_huespedes: "Huéspedes registrados en establecimientos reportantes"
     poblacion_residente: "Población residente (INEC)"
+    oferta_registrada: "Establecimientos y capacidad inscritos en registros oficiales (catastro, base municipal)"
+    empleo_asociados: "Personas empleadas por los establecimientos que reportan"
+    establecimientos_asociados: "Establecimientos que reportan la plantilla anual de accesibilidad"
     sistema: "Fuentes, cargas y registros del propio observatorio"
   periodicidad: [diaria, semanal, mensual, trimestral, anual, feriado, por_carga]
   geografia_niveles: [canton, zona, parroquia]
@@ -50,7 +53,19 @@ variables_base:
   habitaciones_noche_ocupadas:  {unidad: habitaciones-noche, origen: plantilla_alojamiento}
   plazas_cama_noche_disponibles: {unidad: plazas-cama-noche, origen: plantilla_alojamiento}
   ingreso_habitaciones_usd:     {unidad: USD, origen: plantilla_alojamiento, nota: "Sin IVA ni servicio; solo venta de habitaciones"}
-  poblacion_residente:          {unidad: personas, origen: "INEC (Censo 2022 / proyecciones)"}
+  poblacion_residente:          {unidad: personas, origen: "INEC: proyección del año (extractor inec_poblacion); si falta, Censo 2022"}
+  establecimientos_catastro_alojamiento: {unidad: establecimientos, origen: "extractor catastro_turistico (actividad ALOJAMIENTO)"}
+  plazas_instaladas_municipio:  {unidad: plazas, origen: "extractor hosteleria_cuenca"}
+  empleo_total:                 {unidad: personas, origen: plantilla_empleo}
+  empleo_estacional:            {unidad: personas, origen: plantilla_empleo}
+  habitaciones_auditadas:       {unidad: habitaciones, origen: plantilla_accesibilidad}
+  habitaciones_accesibles:      {unidad: habitaciones, origen: plantilla_accesibilidad}
+  establecimientos_certificados: {unidad: establecimientos, origen: "plantilla_accesibilidad (certificación vigente en el año)"}
+  establecimientos_reportantes_anual: {unidad: establecimientos, origen: plantilla_accesibilidad}
+  agua_m3:                      {unidad: "m³", origen: plantilla_consumos}
+  energia_kwh:                  {unidad: kWh, origen: plantilla_consumos}
+  residuos_kg:                  {unidad: kg, origen: plantilla_consumos}
+  noches_con_consumo:           {unidad: noches, origen: "noches del reporte de alojamiento de los mismos establecimientos y meses"}
   campos_criticos_validos:      {unidad: campos, origen: "validador de cargas"}
   campos_criticos_esperados:    {unidad: campos, origen: "validador de cargas"}
   registros_validos:            {unidad: registros, origen: "validador de cargas"}
@@ -206,31 +221,30 @@ indicadores:
     responsable: null
 
   - codigo: B1
-    version: 1
-    nombre: Establecimientos de alojamiento reportantes
+    version: 2
+    nombre: Establecimientos de alojamiento registrados
     tipo_base: estandar
     fase: mvp
     mvp_5: false
     prioridad: alta
-    objetivo_decision: "Conocer la estructura de la oferta participante por tipo, categoría y territorio."
-    definicion_negocio: "Cuántos establecimientos activos enviaron su reporte del mes."
-    definicion_estadistica: "Conteo de unidades activas con reporte válido en el período."
+    objetivo_decision: "Conocer el tamaño y la estructura de la oferta de alojamiento por tipo y territorio."
+    definicion_negocio: "Cuántos alojamientos turísticos están inscritos en el catastro oficial."
+    definicion_estadistica: "Conteo de establecimientos con actividad ALOJAMIENTO en el catastro turístico nacional, por fecha de corte."
     calculo:
-      expresion: "establecimientos_reportantes"
-    formula_texto: "Establecimientos_t = conteo de unidades con reporte válido"
+      expresion: "establecimientos_catastro_alojamiento"
+    formula_texto: "Establecimientos = conteo del catastro con actividad Alojamiento"
     unidad: establecimientos
-    universo: alojamiento_formal_habitaciones
+    universo: oferta_registrada
     periodicidad: mensual
     geografia: [canton, parroquia]
-    dimensiones_filtro: [tipo_alojamiento, categoria, parroquia]
-    fuentes: [plantilla_alojamiento_camara, catastro_mintur]
-    cobertura_ver: Q1
+    dimensiones_filtro: [clasificacion, parroquia]
+    fuentes: [catastro_turistico]
     tratamiento:
-      faltantes: "N/A"
-      duplicados: "Por código de establecimiento."
+      faltantes: "Se publica cada fecha de corte del catastro; entre cortes no se interpola."
+      duplicados: "El catastro identifica cada establecimiento por RUC y código; se cuenta una vez por fila."
       atipicos: "N/A"
-    limitaciones: "No es el total del catastro de Cuenca; solo los participantes. Para el total usar el Catastro de MINTUR como serie separada."
-    referencias: ["Eurostat capacidad", "MINTUR Catastro Turístico"]
+    limitaciones: "El catastro se actualiza de forma irregular (último corte: febrero 2025). Incluye inmuebles habitacionales turísticos. La v1 contaba solo hoteles reportantes; ese dato sigue en Q1."
+    referencias: ["Eurostat capacidad", "Catastro Turístico Nacional (MPCEI)"]
     responsable: null
 
   - codigo: B2
@@ -410,7 +424,7 @@ indicadores:
     responsable: null
 
   - codigo: D4
-    version: 1
+    version: 2
     nombre: Intensidad turística
     tipo_base: estandar
     fase: mvp_ampliado
@@ -432,11 +446,216 @@ indicadores:
     fuentes: [plantilla_alojamiento_camara, inec_poblacion]
     cobertura_ver: Q1
     tratamiento:
-      faltantes: "Usar la población del año del período; si no existe, la última disponible marcada como estimado."
+      faltantes: "Usa la proyección INEC del año del período (marcada como estimado); si no existe, el Censo 2022."
       duplicados: "N/A"
       atipicos: "N/A"
-    limitaciones: "Con cobertura parcial de hoteles, subestima la intensidad real. Mostrar siempre junto con Q1."
-    referencias: ["Eurostat tourism intensity"]
+    limitaciones: "Con cobertura parcial de hoteles, subestima la intensidad real. Mostrar siempre junto con Q1. La v1 usaba siempre el Censo 2022."
+    referencias: ["Eurostat tourism intensity", "INEC Proyecciones Revisión 2024"]
+    responsable: null
+
+  - codigo: D6
+    version: 1
+    nombre: Plazas de alojamiento por 100 residentes
+    tipo_base: estandar
+    fase: mvp_ampliado
+    mvp_5: false
+    prioridad: alta
+    objetivo_decision: "Medir la presión estructural de la oferta de alojamiento sobre la ciudad."
+    definicion_negocio: "Cuántas plazas de alojamiento hay por cada 100 habitantes."
+    definicion_estadistica: "Plazas instaladas en alojamientos comerciales / población residente × 100 (ETIS C.1.3)."
+    calculo:
+      numerador: "plazas_instaladas_municipio"
+      denominador: "poblacion_residente"
+      factor: 100
+    formula_texto: "Plazas por 100 residentes = Plazas instaladas / Población × 100"
+    unidad: plazas por 100 habitantes
+    universo: oferta_registrada
+    periodicidad: mensual
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [hosteleria_cuenca, inec_poblacion]
+    tratamiento:
+      faltantes: "Se calcula en cada fecha de corte de la base municipal, con la población del mismo año."
+      duplicados: "N/A"
+      atipicos: "N/A"
+    limitaciones: "La base municipal no trae parroquia, solo total cantonal. Plazas declaradas por los establecimientos."
+    referencias: ["ETIS 2016 C.1.3", "INEC Proyecciones Revisión 2024"]
+    responsable: null
+
+  # ---------------- Empleo y sostenibilidad (plantillas complementarias) ----------------------
+
+  - codigo: D3
+    version: 1
+    nombre: Empleo turístico estacional
+    tipo_base: estandar
+    fase: segunda
+    mvp_5: false
+    prioridad: media
+    objetivo_decision: "Ver cuánto depende el empleo del sector de las temporadas altas."
+    definicion_negocio: "Qué porcentaje de las personas que trabajan en los alojamientos tiene un contrato solo por temporada."
+    definicion_estadistica: "Empleo estacional / empleo turístico total × 100 (ETIS B.3.2)."
+    calculo:
+      numerador: "empleo_estacional"
+      denominador: "empleo_total"
+      factor: 100
+    formula_texto: "Empleo estacional (%) = Empleo estacional / Empleo total × 100"
+    unidad: "%"
+    universo: empleo_asociados
+    periodicidad: trimestral
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [plantilla_empleo_camara]
+    tratamiento:
+      faltantes: "Solo establecimientos que reportan el trimestre."
+      duplicados: "Un reporte vigente por establecimiento y período."
+      atipicos: "Rechazo si el estacional supera el total."
+    limitaciones: "Cubre solo a los asociados que reportan; no es el empleo turístico total del cantón (D2)."
+    referencias: ["ETIS 2016 B.3.2"]
+    responsable: null
+
+  - codigo: E1
+    version: 1
+    nombre: Habitaciones accesibles
+    tipo_base: estandar
+    fase: segunda
+    mvp_5: false
+    prioridad: media
+    objetivo_decision: "Planificar mejoras de accesibilidad e informar la oferta accesible."
+    definicion_negocio: "Qué porcentaje de las habitaciones revisadas es accesible para personas con discapacidad."
+    definicion_estadistica: "Habitaciones accesibles / habitaciones auditadas × 100 (ETIS C.4.1)."
+    calculo:
+      numerador: "habitaciones_accesibles"
+      denominador: "habitaciones_auditadas"
+      factor: 100
+    formula_texto: "Habitaciones accesibles (%) = Accesibles / Auditadas × 100"
+    unidad: "%"
+    universo: alojamiento_formal_habitaciones
+    periodicidad: anual
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [plantilla_accesibilidad_camara]
+    tratamiento:
+      faltantes: "Solo establecimientos que reportan el año."
+      duplicados: "Un reporte vigente por establecimiento y período."
+      atipicos: "Rechazo si las accesibles superan las auditadas."
+    limitaciones: "Depende de que todos apliquen el mismo criterio técnico de accesibilidad."
+    referencias: ["ETIS 2016 C.4.1"]
+    responsable: null
+
+  - codigo: E6
+    version: 1
+    nombre: Establecimientos con certificación
+    tipo_base: estandar
+    fase: segunda
+    mvp_5: false
+    prioridad: media
+    objetivo_decision: "Seguir la adopción de prácticas verificadas de calidad y sostenibilidad."
+    definicion_negocio: "Qué porcentaje de los establecimientos tiene una certificación de calidad, sostenibilidad o responsabilidad social vigente."
+    definicion_estadistica: "Establecimientos con certificación vigente en el año / establecimientos que reportan × 100 (ETIS A.1.1)."
+    calculo:
+      numerador: "establecimientos_certificados"
+      denominador: "establecimientos_reportantes_anual"
+      factor: 100
+    formula_texto: "Certificados (%) = Con certificación vigente / Reportantes × 100"
+    unidad: "%"
+    universo: establecimientos_asociados
+    periodicidad: anual
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [plantilla_accesibilidad_camara]
+    tratamiento:
+      faltantes: "Solo establecimientos que reportan el año."
+      duplicados: "Un reporte vigente por establecimiento y período."
+      atipicos: "N/A"
+    limitaciones: "Cuenta como vigente una certificación que no venció antes de empezar el año. No valida la certificación ante el emisor."
+    referencias: ["ETIS 2016 A.1.1"]
+    responsable: null
+
+  - codigo: E3
+    version: 1
+    nombre: Agua por noche turística
+    tipo_base: estandar
+    fase: avanzada
+    mvp_5: false
+    prioridad: media
+    objetivo_decision: "Medir la eficiencia en el uso del agua y la presión sobre el recurso."
+    definicion_negocio: "Cuántos litros de agua se consumen por cada noche de un huésped."
+    definicion_estadistica: "Consumo de agua de los alojamientos / noches turísticas de esos mismos alojamientos (ETIS D.5.1)."
+    calculo:
+      numerador: "agua_m3"
+      denominador: "noches_con_consumo"
+      factor: 1000
+    formula_texto: "Agua por noche (litros) = Agua (m³) × 1.000 / Noches"
+    unidad: "litros por noche"
+    universo: alojamiento_formal_huespedes
+    periodicidad: mensual
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [plantilla_consumos_camara, plantilla_alojamiento_camara]
+    tratamiento:
+      faltantes: "Solo establecimientos que reportan consumo y alojamiento del mismo mes."
+      duplicados: "Un reporte vigente por establecimiento y período."
+      atipicos: "N/A"
+    limitaciones: "Atribuye al turismo todo el consumo del alojamiento (incluye personal y áreas comunes)."
+    referencias: ["ETIS 2016 D.5.1"]
+    responsable: null
+
+  - codigo: E4
+    version: 1
+    nombre: Energía por noche turística
+    tipo_base: estandar
+    fase: avanzada
+    mvp_5: false
+    prioridad: media
+    objetivo_decision: "Seguir la eficiencia energética del sector."
+    definicion_negocio: "Cuántos kWh de electricidad se consumen por cada noche de un huésped."
+    definicion_estadistica: "Energía consumida por los alojamientos / noches turísticas de esos mismos alojamientos (ETIS D.6.1)."
+    calculo:
+      numerador: "energia_kwh"
+      denominador: "noches_con_consumo"
+      factor: 1
+    formula_texto: "Energía por noche = kWh / Noches"
+    unidad: "kWh por noche"
+    universo: alojamiento_formal_huespedes
+    periodicidad: mensual
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [plantilla_consumos_camara, plantilla_alojamiento_camara]
+    tratamiento:
+      faltantes: "Solo establecimientos que reportan consumo y alojamiento del mismo mes."
+      duplicados: "Un reporte vigente por establecimiento y período."
+      atipicos: "N/A"
+    limitaciones: "Solo electricidad de la red; no incluye gas ni otros combustibles."
+    referencias: ["ETIS 2016 D.6.1"]
+    responsable: null
+
+  - codigo: E5
+    version: 1
+    nombre: Residuos por noche turística
+    tipo_base: estandar
+    fase: avanzada
+    mvp_5: false
+    prioridad: media
+    objetivo_decision: "Diseñar programas de reducción y separación de residuos con los alojamientos."
+    definicion_negocio: "Cuántos kilos de residuos se generan por cada noche de un huésped."
+    definicion_estadistica: "Residuos generados por los alojamientos / noches turísticas de esos mismos alojamientos (ETIS D.3.1)."
+    calculo:
+      numerador: "residuos_kg"
+      denominador: "noches_con_consumo"
+      factor: 1
+    formula_texto: "Residuos por noche = kg / Noches"
+    unidad: "kg por noche"
+    universo: alojamiento_formal_huespedes
+    periodicidad: mensual
+    geografia: [canton]
+    dimensiones_filtro: []
+    fuentes: [plantilla_consumos_camara, plantilla_alojamiento_camara]
+    tratamiento:
+      faltantes: "Solo establecimientos que reportan consumo y alojamiento del mismo mes."
+      duplicados: "Un reporte vigente por establecimiento y período."
+      atipicos: "N/A"
+    limitaciones: "Depende de que los establecimientos pesen sus residuos con el mismo método."
+    referencias: ["ETIS 2016 D.3.1"]
     responsable: null
 
   # ---------------- Indicadores internos de calidad (Manual sección 9 + anteproyecto 8.2) ----
@@ -570,7 +789,7 @@ indicadores:
     responsable: null
 
 # Indicadores del manual que NO entran en esta versión (se agregarán como nuevas fichas):
-# A3, A6-A9 (requieren encuestas), C1-C8 (requieren convenio STR), D1-D3, D5-D8, E1-E6, B8-B9.
+# A3, A6-A9 (requieren encuestas), C1-C8 (requieren convenio STR), D1, D2, D5, D7, D8, E2, B8-B9.
 # Indicadores del anteproyecto pendientes de definir con fuente: origen del visitante
 # (cubierto parcialmente por residencia en A1/A2), llegadas por canal (requiere terminal/
 # aeropuerto) y actividad por temporada (se resuelve como vista de series de A2/B4).

@@ -6,12 +6,12 @@ export function Placa({ codigo }: { codigo: string }) {
   return <span className="placa" title={`Indicador ${codigo}`}>{codigo}</span>
 }
 
-/** Variación frente al mismo mes del año anterior. */
-export function Variacion({ valor }: { valor: number | null }) {
+/** Variación frente al mismo período del año anterior. Con menorEsMejor (consumos) una baja se pinta como buena. */
+export function Variacion({ valor, menorEsMejor = false }: { valor: number | null; menorEsMejor?: boolean }) {
   if (valor === null) return <span className="text-sm text-piedra">sin comparación</span>
   const sube = valor >= 0
   return (
-    <span className={`text-sm ${sube ? 'text-rio' : 'text-critico'}`}>
+    <span className={`text-sm ${sube !== menorEsMejor ? 'text-rio' : 'text-critico'}`}>
       {sube ? '+' : '−'}{Math.abs(valor).toLocaleString('es-EC', { maximumFractionDigits: 1 })} % frente al año anterior
     </span>
   )

@@ -1,42 +1,47 @@
 # Pendientes de TurisData
 
-Estado al 1 de noviembre de 2026. Referencias: anteproyecto (RF, RNF, E), manual metodológico y reunión con el profesor.
+Estado al 1 de noviembre de 2026 (actualizado tras las plantillas de carga). Referencias: anteproyecto (RF, RNF, E), manual metodológico y reunión con el profesor.
 Marca `[x]` cuando se cumpla.
 
 ## 1. Desarrollo del sistema (equipo de desarrollo)
 
 **Datos por scraping y descarga automática**
-- [ ] Extractor del catastro turístico (Datos Abiertos Ecuador, API CKAN)
-- [ ] Extractor de hostelería con habitaciones y plazas (Cuenca en Datos, API CKAN)
-- [ ] Extractor de proyecciones de población (INEC, XLSX)
+- [x] Extractor del catastro turístico (Datos Abiertos Ecuador)
+- [x] Extractor de hostelería con habitaciones y plazas (Cuenca en Datos)
+- [x] Extractor de proyecciones de población (INEC, XLSX)
 - [ ] Extractor de empleo por rama para Cuenca (ENEMDU, INEC)
 - [ ] Extractor de informes de ocupación en feriados (Fundación Turismo para Cuenca, PDF)
 - [ ] Extractor del boletín mensual del MPCEI (contexto provincial, PDF)
-- [ ] Ejecución programada de los extractores (RF-04)
-- [ ] Pantalla "Fuentes y extracciones" en el panel: estado, errores, botón de ejecutar (RF-02, RF-04)
+- [x] Ejecución programada de los extractores (RF-04)
+- [x] Pantalla "Fuentes y extracciones" en el panel: estado, errores, botón de ejecutar (RF-02, RF-04)
 
 **Indicadores**
-- [ ] Calcular B1–B3 (capacidad instalada) con los datos municipales
-- [ ] Calcular D1 con las ventas del SRI (como indicador de actividad)
-- [ ] Calcular D2 (empleo) y D6 (plazas por 100 residentes)
-- [ ] Usar la población proyectada por año en D4 (hoy usa el censo 2022)
+- [x] Calcular B1 con el catastro (versión 2) y guardar habitaciones y plazas instaladas municipales
+- [x] Mostrar la oferta instalada (catastro y hostelería) en el sitio público (página Economía y oferta)
+- [x] Publicar las ventas del SRI como indicador de actividad (página Economía y oferta)
+- [x] Calcular D6 (plazas por 100 residentes)
+- [ ] Calcular D2 (empleo, ENEMDU)
+- [x] Calcular D3, E1, E6 (empleo estacional, accesibilidad, certificaciones) y E3–E5 (agua, energía y residuos por noche)
+- [x] Mostrar D3, E1, E3–E6 en el sitio público (página Sostenibilidad y empleo)
+- [x] Usar la población proyectada por año en D4 (versión 2)
 
 **Dashboards**
-- [ ] Filtros por rango de fechas, parroquia, tipo y categoría de alojamiento (RF-07)
-- [ ] Página económica con las ventas del SRI y su tendencia
+- [x] Filtros por mes, rango de fechas, parroquia y categoría de alojamiento (RF-07)
+- [x] Página económica con las ventas del SRI y su tendencia
 - [ ] Fecha de actualización por indicador (RF-11)
 - [ ] Exportación a PDF además de CSV (RF-08)
 
 **Carga de información en el panel**
-- [ ] Plantilla de empleo (total y estacional)
-- [ ] Plantilla de accesibilidad y certificaciones
-- [ ] Plantilla de consumos de agua, energía y residuos
-- [ ] Carga manual de series de otras entidades (aeropuerto, terminal, Cajas, feriados)
+- [x] Plantilla de empleo (total y estacional)
+- [x] Plantilla de accesibilidad y certificaciones
+- [x] Plantilla de consumos de agua, energía y residuos
+- [x] Carga manual de series de otras entidades (aeropuerto, terminal, Cajas, feriados)
 - [ ] Pantalla para consultar y corregir datos históricos (RF-09)
 
 **Calidad, seguridad y operación**
 - [ ] Sacar las cuentas demo del `.env` (solo queda el administrador inicial)
-- [ ] Pruebas automáticas: cálculo, validaciones, permisos, API (E5)
+- [x] Pruebas automáticas: cálculo, validaciones, permisos, API, extractores (E5): 113 del backend + 10 del frontend
+- [x] Integración continua con GitHub Actions
 - [ ] Revisión de accesibilidad WCAG 2.2 AA (RNF-01)
 - [ ] Prueba de rendimiento: consultas típicas en menos de 2 s (RNF-02)
 - [ ] Respaldos automáticos y prueba de restauración (RNF-05)

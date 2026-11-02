@@ -11,6 +11,7 @@ anteriores y deja registro de cada ejecución en operativo.ejecucion_extractor.
 import hashlib
 import json
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date
 from urllib.parse import urlparse
@@ -23,6 +24,27 @@ from ..nucleo.db import transaccion
 
 AGENTE = "TurisData-Observatorio/0.1 (proyecto de titulacion; Camara de Turismo del Azuay)"
 PAUSA_ENTRE_PETICIONES = 2.0  # segundos, para no sobrecargar los sitios
+HORAS_EJECUCION_ABANDONADA = 2  # una ejecución "en curso" más antigua se considera caída
+
+# Nombres que las fuentes escriben distinto a operativo.geografia (ya normalizados)
+ALIAS_GEOGRAFIA = {"VALLE": "ELVALLE"}
+
+
+def clave_geografica(nombre: str) -> str:
+    """'Huayna Cápac', 'HUAYNACÁPAC' y 'huayna capac' dan la misma clave."""
+    sin_tildes = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
+    clave = "".join(c for c in sin_tildes.upper() if c.isalpha())
+    return ALIAS_GEOGRAFIA.get(clave, clave)
+
+
+def ejecucion_en_curso(fuente_codigo: str) -> bool:
+    """Evita lanzar dos veces la misma fuente al mismo tiempo."""
+    with transaccion() as con:
+        return bool(con.execute(text(
+            """SELECT 1 FROM operativo.ejecucion_extractor e JOIN operativo.fuente_datos f ON f.id = e.fuente_id
+               WHERE f.codigo = :c AND e.estado = 'en_curso'
+                 AND e.iniciada_en > now() - make_interval(hours => :h)"""),
+            dict(c=fuente_codigo, h=HORAS_EJECUCION_ABANDONADA)).first())
 
 
 @dataclass
@@ -47,7 +69,7 @@ class Extractor:
 
     def __init__(self):
         self._cliente = httpx.Client(headers={"User-Agent": AGENTE}, timeout=60, follow_redirects=True)
-        self._ultima_peticion = 0.0
+        self._ultima_peticion: dict[str, float] = {}
         self._robots: dict[str, RobotFileParser] = {}
 
     # --- a implementar por cada fuente -------------------------------------------------
@@ -58,7 +80,7 @@ class Extractor:
         raise NotImplementedError
 
     # --- utilidades HTTP con cortesía -------------------------------------------------
-    def permitido(self, url: str) -> bool:
+    def _robots_de(self, url: str) -> RobotFileParser:
         partes = urlparse(url)
         base = f"{partes.scheme}://{partes.netloc}"
         if base not in self._robots:
@@ -69,16 +91,21 @@ class Extractor:
             except httpx.HTTPError:
                 robots.parse([])
             self._robots[base] = robots
-        return self._robots[base].can_fetch(AGENTE, url)
+        return self._robots[base]
+
+    def permitido(self, url: str) -> bool:
+        return self._robots_de(url).can_fetch(AGENTE, url)
 
     def obtener(self, url: str, **kwargs) -> httpx.Response:
         if not self.permitido(url):
             raise FuenteNoPermitida(f"robots.txt no permite acceder a {url}")
-        espera = PAUSA_ENTRE_PETICIONES - (time.monotonic() - self._ultima_peticion)
+        sitio = urlparse(url).netloc
+        pausa = max(PAUSA_ENTRE_PETICIONES, float(self._robots_de(url).crawl_delay(AGENTE) or 0))
+        espera = pausa - (time.monotonic() - self._ultima_peticion.get(sitio, 0.0))
         if espera > 0:
             time.sleep(espera)
         respuesta = self._cliente.get(url, **kwargs)
-        self._ultima_peticion = time.monotonic()
+        self._ultima_peticion[sitio] = time.monotonic()
         respuesta.raise_for_status()
         return respuesta
 
@@ -107,9 +134,11 @@ class Extractor:
                 resultado.update(estado="sin_cambios", mensaje="La fuente no cambió desde la última ejecución")
             else:
                 datos = self.interpretar(contenido)
-                nuevos, actualizados = self._guardar(datos, ejecucion_id)
-                resultado.update(estado="ok", nuevos=nuevos, actualizados=actualizados,
-                                 mensaje=f"{len(datos)} datos leídos")
+                nuevos, actualizados, omitidos = self._guardar(datos, ejecucion_id)
+                mensaje = f"{len(datos)} datos leídos"
+                if omitidos:
+                    mensaje += f"; sin zona geográfica reconocida: {', '.join(sorted(omitidos))}"
+                resultado.update(estado="ok", nuevos=nuevos, actualizados=actualizados, mensaje=mensaje)
             resultado["hash"] = huella
         except Exception as e:  # se registra cualquier falla para verla en el panel
             resultado["mensaje"] = f"{type(e).__name__}: {e}"[:1000]
@@ -124,15 +153,25 @@ class Extractor:
                    WHERE id = :id"""),
                 dict(estado=resultado["estado"], hash=resultado.get("hash"), nuevos=resultado["nuevos"],
                      actualizados=resultado["actualizados"], mensaje=resultado["mensaje"], id=ejecucion_id))
+
+        if resultado["nuevos"] or resultado["actualizados"]:
+            from ..servicios.indicadores import recalcular  # import local: evita un ciclo de módulos
+            recalcular()
         return resultado
 
-    def _guardar(self, datos: list[Dato], ejecucion_id: int) -> tuple[int, int]:
+    def _guardar(self, datos: list[Dato], ejecucion_id: int) -> tuple[int, int, set[str]]:
         """Inserta datos nuevos; si un valor cambió, marca el anterior como no vigente."""
         nuevos = actualizados = 0
+        omitidos: set[str] = set()
         with transaccion() as con:
-            geografias = dict(con.execute(text("SELECT nombre, id FROM operativo.geografia")).all())
+            geografias = {clave_geografica(nombre): id_ for nombre, id_ in
+                          con.execute(text("SELECT nombre, id FROM operativo.geografia")).all()}
             for d in datos:
-                clave = dict(v=d.variable, g=geografias[d.geografia], ini=d.periodo_inicio, per=d.periodicidad,
+                geografia_id = geografias.get(clave_geografica(d.geografia))
+                if geografia_id is None:
+                    omitidos.add(d.geografia)
+                    continue
+                clave = dict(v=d.variable, g=geografia_id, ini=d.periodo_inicio, per=d.periodicidad,
                              ev=d.evento or "", dims=json.dumps(d.dimensiones, ensure_ascii=False, sort_keys=True))
                 actual = con.execute(text(
                     """SELECT id, valor FROM operativo.observacion_externa
@@ -153,4 +192,4 @@ class Extractor:
                           valor, ejecucion_id)
                        VALUES (:v, :g, :ini, :fin, :per, NULLIF(:ev, ''), CAST(:dims AS jsonb), :valor, :ej)"""),
                     {**clave, "fin": d.periodo_fin, "valor": d.valor, "ej": ejecucion_id})
-        return nuevos, actualizados
+        return nuevos, actualizados, omitidos

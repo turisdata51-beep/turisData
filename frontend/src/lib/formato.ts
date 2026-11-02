@@ -10,9 +10,22 @@ export function mes(periodo: string | null | undefined, corto = false): string {
   return corto ? `${MESES_CORTOS[m - 1]} ${String(a).slice(2)}` : `${MESES[m - 1]} ${a}`
 }
 
+/** "2026-07-01" → "julio a septiembre 2026" (o "T3 26" si corto). */
+export function trimestre(periodo: string | null | undefined, corto = false): string {
+  if (!periodo) return '—'
+  const [a, m] = periodo.split('-').map(Number)
+  const t = Math.floor((m - 1) / 3)
+  return corto ? `T${t + 1} ${String(a).slice(2)}` : `${MESES[t * 3]} a ${MESES[t * 3 + 2]} ${a}`
+}
+
 export function fechaHora(valor: string | null | undefined): string {
   if (!valor) return '—'
   return new Date(valor).toLocaleString('es-EC', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+export function fecha(valor: string | null | undefined): string {
+  if (!valor) return '—'
+  return new Date(valor).toLocaleDateString('es-EC', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export function numero(valor: number | null | undefined, decimales = 0): string {
@@ -27,6 +40,8 @@ export function valorKpi(valor: number | null, unidad: string): string {
   if (unidad.startsWith('USD')) return `$${numero(valor, 2)}`
   if (unidad.startsWith('noches por llegada')) return numero(valor, 2)
   if (unidad.startsWith('noches por 1.000')) return numero(valor, 1)
+  if (unidad.startsWith('kWh por noche')) return numero(valor, 1)
+  if (unidad.startsWith('kg por noche')) return numero(valor, 2)
   return numero(valor)
 }
 

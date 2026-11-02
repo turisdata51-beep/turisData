@@ -5,7 +5,7 @@ Base de datos PostgreSQL con dos esquemas:
 - **operativo**: lo que entra al sistema (usuarios, fuentes, cargas, reportes de hoteles, datos extraídos de la web, auditoría).
 - **analitico**: lo que el sistema calcula (indicadores versionados y sus valores).
 
-Definición completa en los scripts de `db/` (`001_esquema.sql` a `004_extracciones.sql`).
+Definición completa en los scripts de `db/` (`001_esquema.sql` a `006_plantillas_complementarias.sql`).
 
 ```mermaid
 erDiagram
@@ -21,6 +21,12 @@ erDiagram
     USUARIO |o--o{ CARGA_ERROR : "corrige"
     CARGA_DATOS ||--o{ REPORTE_ALOJAMIENTO_MENSUAL : "contiene"
     ESTABLECIMIENTO ||--o{ REPORTE_ALOJAMIENTO_MENSUAL : "reporta"
+    CARGA_DATOS ||--o{ REPORTE_EMPLEO_TRIMESTRAL : "contiene"
+    ESTABLECIMIENTO ||--o{ REPORTE_EMPLEO_TRIMESTRAL : "reporta"
+    CARGA_DATOS ||--o{ REPORTE_ACCESIBILIDAD_ANUAL : "contiene"
+    ESTABLECIMIENTO ||--o{ REPORTE_ACCESIBILIDAD_ANUAL : "reporta"
+    CARGA_DATOS ||--o{ REPORTE_CONSUMO_MENSUAL : "contiene"
+    ESTABLECIMIENTO ||--o{ REPORTE_CONSUMO_MENSUAL : "reporta"
     FUENTE_DATOS ||--o{ VARIABLE_EXTERNA : "publica"
     FUENTE_DATOS ||--o{ EJECUCION_EXTRACTOR : "se extrae en"
     USUARIO |o--o{ EJECUCION_EXTRACTOR : "lanza"
@@ -81,11 +87,14 @@ erDiagram
         int sla_dias
         bool prioritaria
         text tipo_fuente
+        text extractor "null = carga manual"
+        int frecuencia_extraccion_dias
     }
     CARGA_DATOS {
         bigint id PK
         int fuente_id FK
         int usuario_id FK
+        text plantilla "alojamiento, empleo, accesibilidad, consumos, series_externas"
         text nombre_archivo
         text hash_sha256
         timestamptz recibido_en
@@ -116,6 +125,37 @@ erDiagram
         int noches_residentes
         int noches_no_residentes
         numeric ingreso_habitaciones_usd
+    }
+    REPORTE_EMPLEO_TRIMESTRAL {
+        bigint id PK
+        bigint carga_id FK
+        int establecimiento_id FK
+        date periodo "inicio del trimestre"
+        bool vigente
+        int empleo_total
+        int empleo_estacional "no supera el total"
+        int empleo_mujeres
+    }
+    REPORTE_ACCESIBILIDAD_ANUAL {
+        bigint id PK
+        bigint carga_id FK
+        int establecimiento_id FK
+        int anio
+        bool vigente
+        int habitaciones_auditadas
+        int habitaciones_accesibles "no supera las auditadas"
+        text certificacion
+        date certificacion_vigente_hasta
+    }
+    REPORTE_CONSUMO_MENSUAL {
+        bigint id PK
+        bigint carga_id FK
+        int establecimiento_id FK
+        date periodo
+        bool vigente
+        numeric agua_m3
+        numeric energia_kwh
+        numeric residuos_kg
     }
     VARIABLE_EXTERNA {
         text codigo PK
@@ -189,7 +229,7 @@ erDiagram
 ## Notas
 
 - **Usuarios**: viven en `operativo.usuario`; la contraseña se guarda solo como hash (scrypt). Las variables `ADMIN_*` y `DEMO_*` de `backend/.env` únicamente sirven para crear las cuentas iniciales la primera vez.
-- **Histórico sin borrado**: `reporte_alojamiento_mensual.vigente` y `observacion_externa.vigente` marcan la versión actual; las anteriores se conservan.
+- **Histórico sin borrado**: la columna `vigente` de los cuatro `reporte_*` y de `observacion_externa` marca la versión actual; las anteriores se conservan.
 - **Trazabilidad**: cada dato apunta a la carga (`carga_datos`) o a la ejecución del scraper (`ejecucion_extractor`) que lo trajo.
 - **`analitico.observacion`** guarda los arreglos `fuente_ids` y `carga_ids` para saber de dónde salió cada valor calculado.
 - **Vista** `analitico.v_alojamiento_mensual`: suma los reportes vigentes por mes, cantón y parroquia; el motor de cálculo parte de ella.

@@ -1,4 +1,5 @@
-"""Carga DATOS DE DEMOSTRACIÓN: 26 alojamientos ficticios con reportes de ene-2024 a sep-2026.
+"""Carga DATOS DE DEMOSTRACIÓN: 26 alojamientos ficticios con reportes de ene-2024 a sep-2026
+(alojamiento mensual, empleo trimestral, accesibilidad anual y consumos mensuales).
 
 Uso:  python -m app.scripts.datos_demo            (no hace nada si ya existen)
       python -m app.scripts.datos_demo --reiniciar (borra los datos demo y los vuelve a crear)
@@ -96,6 +97,62 @@ def _reporte(hab, tarifa, periodo: date, factor_hotel: float):
         ingreso=round(ocupadas * adr, 2))
 
 
+TABLAS_DE_REPORTES = ("operativo.reporte_alojamiento_mensual", "operativo.reporte_empleo_trimestral",
+                      "operativo.reporte_accesibilidad_anual", "operativo.reporte_consumo_mensual")
+
+
+def _carga(con, plantilla: str, fuente: str, nombre: str, filas: int) -> int:
+    return con.execute(text("""
+        INSERT INTO operativo.carga_datos (fuente_id, mecanismo, nombre_archivo, version_plantilla, plantilla,
+          registros_recibidos, registros_validos, estado)
+        SELECT id, 'archivo', :n, 'v1', :p, :k, :k, 'publicada' FROM operativo.fuente_datos WHERE codigo = :f
+        RETURNING id"""), dict(n=nombre, p=plantilla, k=filas, f=fuente)).scalar()
+
+
+def _complementarios(con, hoteles, noches_por_reporte):
+    """Empleo por trimestre, accesibilidad por año y consumos por mes (estos solo en ~60 % de los hoteles)."""
+    empleo = []
+    for est_id, hab, _tarifa, inicio, _factor, _ingreso in hoteles:
+        for anio in (2024, 2025, 2026):
+            for trimestre in range(1, 5):
+                periodo = date(anio, (trimestre - 1) * 3 + 1, 1)
+                if periodo < inicio or periodo > date(2026, 7, 1) or random.random() < .08:
+                    continue
+                total = max(2, round(hab * random.uniform(.45, .7)))
+                temporada = .28 if trimestre in (3, 4) else .14  # vacaciones de la Sierra y fin de año
+                estacional = min(total, round(total * temporada * random.uniform(.7, 1.3)))
+                empleo.append(dict(e=est_id, p=periodo, t=total, s=estacional, m=round(total * random.uniform(.4, .6))))
+    carga = _carga(con, "empleo", "plantilla_empleo_camara", "demo_empleo.xlsx", len(empleo))
+    con.execute(text("""INSERT INTO operativo.reporte_empleo_trimestral
+        (carga_id, establecimiento_id, periodo, empleo_total, empleo_estacional, empleo_mujeres)
+        VALUES (:c, :e, :p, :t, :s, :m)"""), [{**f, "c": carga} for f in empleo])
+
+    accesibilidad = []
+    for est_id, hab, _tarifa, inicio, _factor, _ingreso in hoteles:
+        certificado = random.random() < .35
+        for anio in (2024, 2025, 2026):
+            if anio < inicio.year:
+                continue
+            accesibles = max(0, round(hab * random.uniform(0, .06)))
+            vence = date(anio + 1, random.randint(1, 12), 1) if certificado else None
+            accesibilidad.append(dict(e=est_id, a=anio, h=hab, x=accesibles,
+                                      c="Certificación de calidad (demo)" if certificado else None, v=vence))
+    carga = _carga(con, "accesibilidad", "plantilla_accesibilidad_camara", "demo_accesibilidad.xlsx", len(accesibilidad))
+    con.execute(text("""INSERT INTO operativo.reporte_accesibilidad_anual
+        (carga_id, establecimiento_id, anio, habitaciones_auditadas, habitaciones_accesibles, certificacion,
+         certificacion_vigente_hasta) VALUES (:c, :e, :a, :h, :x, :cert, :v)"""),
+        [{**f, "c": carga, "cert": f["c"]} for f in accesibilidad])
+
+    voluntarios = {h[0] for h in hoteles if random.random() < .6}
+    consumos = [dict(e=e, p=p, agua=round(n * random.uniform(.2, .32), 2), energia=round(n * random.uniform(9, 15), 2),
+                     residuos=round(n * random.uniform(.7, 1.2), 2))
+                for (e, p), n in noches_por_reporte.items() if e in voluntarios and n > 0]
+    carga = _carga(con, "consumos", "plantilla_consumos_camara", "demo_consumos.xlsx", len(consumos))
+    con.execute(text("""INSERT INTO operativo.reporte_consumo_mensual
+        (carga_id, establecimiento_id, periodo, agua_m3, energia_kwh, residuos_kg)
+        VALUES (:c, :e, :p, :agua, :energia, :residuos)"""), [{**f, "c": carga} for f in consumos])
+
+
 def _usuario(con, correo_var, contrasena_var, nombre, rol, establecimiento_id=None):
     correo, contrasena = os.environ.get(correo_var), os.environ.get(contrasena_var)
     if not correo or not contrasena:
@@ -118,11 +175,14 @@ def main():
             demo = "SELECT id FROM operativo.establecimiento WHERE codigo_camara LIKE 'DEMO-%'"
             usuarios_demo = f"SELECT id FROM operativo.usuario WHERE establecimiento_id IN ({demo})"
             ids = [r[0] for r in con.execute(text(
-                f"""SELECT carga_id FROM operativo.reporte_alojamiento_mensual WHERE establecimiento_id IN ({demo})
-                    UNION SELECT id FROM operativo.carga_datos WHERE usuario_id IN ({usuarios_demo})"""))]
-            con.execute(text(f"DELETE FROM operativo.reporte_alojamiento_mensual WHERE establecimiento_id IN ({demo})"))
+                " UNION ".join(f"SELECT carga_id FROM {t} WHERE establecimiento_id IN ({demo})" for t in TABLAS_DE_REPORTES)
+                + f" UNION SELECT id FROM operativo.carga_datos WHERE usuario_id IN ({usuarios_demo})"))]
+            for tabla in TABLAS_DE_REPORTES:
+                con.execute(text(f"DELETE FROM {tabla} WHERE establecimiento_id IN ({demo})"))
             if ids:
-                con.execute(text("DELETE FROM operativo.reporte_alojamiento_mensual WHERE carga_id = ANY(:i)"), dict(i=ids))
+                for tabla in TABLAS_DE_REPORTES:
+                    con.execute(text(f"DELETE FROM {tabla} WHERE carga_id = ANY(:i)"), dict(i=ids))
+                con.execute(text("DELETE FROM operativo.carga_error WHERE carga_id = ANY(:i)"), dict(i=ids))
                 con.execute(text("DELETE FROM operativo.carga_datos WHERE id = ANY(:i)"), dict(i=ids))
             con.execute(text(f"UPDATE operativo.auditoria SET usuario_id = NULL WHERE usuario_id IN ({usuarios_demo})"))
             con.execute(text(f"DELETE FROM operativo.usuario WHERE establecimiento_id IN ({demo})"))
@@ -142,6 +202,7 @@ def main():
                 dict(c=codigo, n=f"Alojamiento demo {i:02d}", t=tipo, cat=cat, p=parroquias[parroquia], d=inicio)).scalar()
             hoteles.append((est_id, hab, tarifa, inicio, random.uniform(.85, 1.15), random.random() < .7))
 
+        noches_por_reporte = {}  # (establecimiento, mes) -> noches, para los consumos
         for periodo in _meses(date(2024, 1, 1), date(2026, 9, 1)):
             siguiente = date(periodo.year + periodo.month // 12, periodo.month % 12 + 1, 1)
             recibido = datetime.combine(siguiente + timedelta(days=random.randint(5, 12)), datetime.min.time(),
@@ -154,6 +215,7 @@ def main():
                 r.update(establecimiento_id=est_id, periodo=periodo,
                          ingreso=r["ingreso"] if reporta_ingreso else None)
                 filas.append(r)
+                noches_por_reporte[(est_id, periodo)] = r["noches_residentes"] + r["noches_no_residentes"]
             carga_id = con.execute(text("""
                 INSERT INTO operativo.carga_datos (fuente_id, mecanismo, nombre_archivo, version_plantilla, recibido_en,
                   registros_recibidos, registros_validos, campos_criticos_esperados, campos_criticos_validos, estado)
@@ -170,6 +232,8 @@ def main():
                    :plazas_cama_noche_disponibles, :llegadas_residentes, :llegadas_no_residentes,
                    :noches_residentes, :noches_no_residentes, :ingreso)"""),
                 [{**f, "carga_id": carga_id} for f in filas])
+
+        _complementarios(con, hoteles, noches_por_reporte)
 
         _usuario(con, "ADMIN_CORREO", "ADMIN_CONTRASENA", "Administrador", "administrador")
         _usuario(con, "DEMO_ANALISTA_CORREO", "DEMO_ANALISTA_CONTRASENA", "Analista demo", "analista")

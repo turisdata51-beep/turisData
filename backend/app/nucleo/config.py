@@ -25,7 +25,6 @@ JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_HORAS = int(os.environ.get("JWT_HORAS", "8"))
 CORS_ORIGENES = os.environ.get("CORS_ORIGENES", "http://localhost:5173").split(",")
 DICCIONARIO = RECURSOS / "diccionario_indicadores.yaml"
-PLANTILLA_ALOJAMIENTO = RECURSOS / "plantillas" / "reporte_mensual_alojamiento_v1.xlsx"
 
 if not JWT_SECRET:
     raise RuntimeError("Falta JWT_SECRET en backend/.env (ver backend/.env.example)")

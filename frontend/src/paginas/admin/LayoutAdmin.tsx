@@ -10,6 +10,7 @@ const SECCIONES: { ruta: string; texto: string; roles: Rol[] }[] = [
   { ruta: '/admin', texto: 'Resumen', roles: ['administrador', 'analista', 'consulta'] },
   { ruta: '/admin/cargas', texto: 'Cargas de datos', roles: ['administrador', 'analista', 'asociado'] },
   { ruta: '/admin/mis-reportes', texto: 'Mis reportes', roles: ['asociado'] },
+  { ruta: '/admin/fuentes', texto: 'Fuentes y extracciones', roles: ['administrador', 'analista', 'consulta'] },
   { ruta: '/admin/establecimientos', texto: 'Establecimientos', roles: ['administrador', 'analista'] },
   { ruta: '/admin/indicadores', texto: 'Indicadores', roles: ['administrador', 'analista', 'consulta'] },
   { ruta: '/admin/usuarios', texto: 'Usuarios', roles: ['administrador'] },

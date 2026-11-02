@@ -20,14 +20,20 @@ def resumen(u=Depends(requiere(*ROLES_INTERNOS))):
     ultima = fila("""SELECT id, recibido_en, registros_recibidos, registros_validos,
                             campos_criticos_esperados, campos_criticos_validos
                      FROM operativo.carga_datos WHERE estado <> 'recibida' ORDER BY id DESC LIMIT 1""")
+    # Última actualización correcta de cada fuente: carga manual o extracción automática
     fuentes = filas("""
-        SELECT f.codigo, f.nombre, f.sla_dias, f.prioritaria,
-               max(c.recibido_en) AS ultima_carga,
-               extract(epoch FROM now() - max(c.recibido_en)) / 86400 AS dias
+        SELECT f.codigo, f.nombre, f.sla_dias, f.prioritaria, u.ultima AS ultima_carga,
+               extract(epoch FROM now() - u.ultima) / 86400 AS dias
         FROM operativo.fuente_datos f
-        LEFT JOIN operativo.carga_datos c ON c.fuente_id = f.id AND c.estado IN ('publicada', 'con_errores')
+        LEFT JOIN LATERAL (
+            SELECT max(t) AS ultima FROM (
+                SELECT c.recibido_en AS t FROM operativo.carga_datos c
+                WHERE c.fuente_id = f.id AND c.estado IN ('publicada', 'con_errores')
+                UNION ALL
+                SELECT e.terminada_en FROM operativo.ejecucion_extractor e
+                WHERE e.fuente_id = f.id AND e.estado IN ('ok', 'sin_cambios')) x) u ON true
         WHERE f.activa AND f.tipo_fuente <> 'sistema'
-        GROUP BY f.id ORDER BY f.prioritaria DESC, f.nombre""")
+        ORDER BY f.prioritaria DESC, f.nombre""")
     prioritarias = [f for f in fuentes if f["prioritaria"]]
     al_dia = [f for f in prioritarias if f["dias"] is not None and f["sla_dias"] and f["dias"] <= f["sla_dias"]]
 

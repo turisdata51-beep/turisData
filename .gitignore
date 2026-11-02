@@ -3,8 +3,10 @@ node_modules/
 .venv/
 __pycache__/
 
-# Compilados
+# Compilados y resultados de pruebas
 frontend/dist/
+.coverage
+.pytest_cache/
 
 # Configuración local con secretos
 backend/.env
