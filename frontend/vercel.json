@@ -1,0 +1,12 @@
+{
+    "rewrites": [
+        {
+            "source": "/api/:ruta*",
+            "destination": "https://turisdata.onrender.com/api/:ruta*"
+        },
+        {
+            "source": "/((?!assets/).*)",
+            "destination": "/index.html"
+        }
+    ]
+}
